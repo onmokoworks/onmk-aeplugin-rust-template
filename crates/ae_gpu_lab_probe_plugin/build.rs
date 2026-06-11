@@ -32,6 +32,8 @@ fn main() {
         ),
         Property::AE_Effect_Match_Name("ONMK AeGpuProbe"),
         Property::AE_Reserved_Info(10),
-        Property::AE_Effect_Support_URL("https://github.com/onmokoworks/AeRustGpuLab"),
+        Property::AE_Effect_Support_URL(
+            "https://github.com/onmokoworks/onmk-aeplugin-rust-template",
+        ),
     ]);
 }

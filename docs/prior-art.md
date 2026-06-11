@@ -26,7 +26,7 @@ Examples and references:
 - Vulkanator / GLator style experiments  
   https://github.com/Wunkolo/Vulkanator
 
-This is the closest path to the current `AeRustGpuLabRust` project.
+This is the closest path to the current `onmk-aeplugin-rust-template` project.
 
 Pros:
 
