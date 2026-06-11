@@ -1,0 +1,9 @@
+/target/
+*.pdb
+*.exp
+*.lib
+*.dll
+*.aex
+*.log
+.DS_Store
+Thumbs.db

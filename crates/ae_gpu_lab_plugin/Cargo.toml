@@ -1,0 +1,15 @@
+[package]
+name = "ae_gpu_lab_plugin"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+ae_gpu_lab_core = { path = "../ae_gpu_lab_core" }
+after-effects.workspace = true
+
+[build-dependencies]
+pipl.workspace = true

@@ -1,0 +1,10 @@
+[package]
+name = "ae_gpu_lab_wgpu_hal_import"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+ae_gpu_lab_native_probe = { path = "../ae_gpu_lab_native_probe" }
+anyhow.workspace = true
+wgpu-hal.workspace = true

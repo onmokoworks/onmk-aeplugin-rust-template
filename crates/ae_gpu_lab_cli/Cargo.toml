@@ -1,0 +1,10 @@
+[package]
+name = "ae_gpu_lab_cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+ae_gpu_lab_core = { path = "../ae_gpu_lab_core" }
+anyhow.workspace = true
+clap.workspace = true

@@ -1,0 +1,36 @@
+[workspace]
+members = [
+    "crates/ae_gpu_lab_core",
+    "crates/ae_gpu_lab_cli",
+    "crates/ae_gpu_lab_native_probe",
+    "crates/ae_gpu_lab_plugin",
+    "crates/ae_gpu_lab_probe_plugin",
+    "crates/ae_gpu_lab_wgpu_hal_import",
+]
+default-members = [
+    "crates/ae_gpu_lab_core",
+    "crates/ae_gpu_lab_cli",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+license = "MIT"
+
+[workspace.dependencies]
+anyhow = "1"
+bytemuck = { version = "1", features = ["derive"] }
+clap = { version = "4", features = ["derive"] }
+libloading = "0.8"
+pollster = "0.4"
+wgpu = "26"
+wgpu-hal = "26"
+
+[workspace.dependencies.after-effects]
+git = "https://github.com/virtualritz/after-effects.git"
+rev = "6326884ee0af7bf9e1e3f4df0057149a7fb16b5d"
+
+[workspace.dependencies.pipl]
+git = "https://github.com/virtualritz/after-effects.git"
+rev = "6326884ee0af7bf9e1e3f4df0057149a7fb16b5d"
