@@ -1,11 +1,10 @@
+use ae_gpu_lab_cuda::{CudaBgra128Job, CudaBgra128Mode};
 use ae_gpu_lab_native_probe::{AeGpuDeviceProbe, AeGpuFramework};
 use after_effects as ae;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
-
-mod cuda_driver;
 
 static LAST_PROBE: OnceLock<Mutex<ProbeState>> = OnceLock::new();
 
@@ -134,9 +133,9 @@ impl AdobePluginGlobal for Plugin {
                 let cuda_copy = params.get(Params::CudaCopyOutput)?.as_checkbox()?.value();
                 let cuda_invert = params.get(Params::CudaInvertOutput)?.as_checkbox()?.value();
                 let mode = if cuda_invert {
-                    CudaRenderMode::Invert
+                    CudaBgra128Mode::InvertRgb
                 } else {
-                    CudaRenderMode::Copy
+                    CudaBgra128Mode::Copy
                 };
                 append_log(&format!(
                     "SmartRenderGpu what_gpu={:?} device={} bit_depth={} cuda_copy={} cuda_invert={} mode={:?} note=copy_is_default",
@@ -161,25 +160,10 @@ impl AdobePluginGlobal for Plugin {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-enum CudaRenderMode {
-    Copy,
-    Invert,
-}
-
-impl CudaRenderMode {
-    fn kernel_mode(self) -> u32 {
-        match self {
-            Self::Copy => 0,
-            Self::Invert => 1,
-        }
-    }
-}
-
 fn cuda_render_gpu_worlds(
     in_data: &ae::InData,
     extra: &ae::pf::SmartRenderExtra,
-    mode: CudaRenderMode,
+    mode: CudaBgra128Mode,
 ) -> Result<(), ae::Error> {
     let Ok(gpu_suite) = ae::pf::suites::GPUDevice::new() else {
         append_log("CUDA render failed: GPUDeviceSuite unavailable");
@@ -217,17 +201,17 @@ fn cuda_render_gpu_worlds(
     let height = input.height().min(output.height());
     let context = info.contextPV;
     let stream = info.command_queuePV;
-    match cuda_driver::process_bgra128_pitched(
+    match ae_gpu_lab_cuda::process_bgra128_pitched(CudaBgra128Job {
         context,
         stream,
-        input_ptr,
-        output_ptr,
-        width as u32,
-        height as u32,
-        input.row_bytes() as u32,
-        output.row_bytes() as u32,
-        mode.kernel_mode(),
-    ) {
+        input: input_ptr,
+        output: output_ptr,
+        width: width as u32,
+        height: height as u32,
+        input_rowbytes: input.row_bytes() as u32,
+        output_rowbytes: output.row_bytes() as u32,
+        mode,
+    }) {
         Ok(()) => {
             append_log(&format!(
                 "CUDA render OK mode={mode:?} context={context:p} stream={stream:p} input={input_ptr:p} output={output_ptr:p} width={width} height={height} in_rowbytes={} out_rowbytes={}",

@@ -8,9 +8,9 @@ license.workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
+ae_gpu_lab_cuda = { path = "../ae_gpu_lab_cuda" }
 ae_gpu_lab_native_probe = { path = "../ae_gpu_lab_native_probe" }
 after-effects.workspace = true
-libloading.workspace = true
 
 [build-dependencies]
 pipl.workspace = true

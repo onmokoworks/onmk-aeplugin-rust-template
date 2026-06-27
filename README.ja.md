@@ -25,6 +25,9 @@ crates/ae_gpu_lab_core
 crates/ae_gpu_lab_cli
   AE外で動かすローカルbenchmark runner
 
+crates/ae_gpu_lab_cuda
+  AEに依存しないnative CUDA実験backend
+
 crates/ae_gpu_lab_plugin
   SmartFX + wgpu実験。AeGpuLab.aexを生成
 

@@ -1,3 +1,9 @@
+//! Minimal native CUDA backend experiments.
+//!
+//! This crate intentionally has no After Effects dependency. AE-specific code
+//! should gather context, stream, pointers, extents, and row strides, then call
+//! this crate with a typed job.
+
 use libloading::{Library, Symbol};
 use std::ffi::{c_char, c_uint, c_void, CString};
 use std::sync::OnceLock;
@@ -28,29 +34,54 @@ type CuLaunchKernel = unsafe extern "C" fn(
 ) -> CUresult;
 type CuStreamSynchronize = unsafe extern "C" fn(CUstream) -> CUresult;
 
-pub fn process_bgra128_pitched(
-    context: *mut c_void,
-    stream: *mut c_void,
-    input: *mut c_void,
-    output: *mut c_void,
-    width: u32,
-    height: u32,
-    input_rowbytes: u32,
-    output_rowbytes: u32,
-    mode: u32,
-) -> Result<(), String> {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CudaBgra128Mode {
+    Copy,
+    InvertRgb,
+}
+
+impl CudaBgra128Mode {
+    fn kernel_mode(self) -> u32 {
+        match self {
+            Self::Copy => 0,
+            Self::InvertRgb => 1,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct CudaBgra128Job {
+    pub context: *mut c_void,
+    pub stream: *mut c_void,
+    pub input: *mut c_void,
+    pub output: *mut c_void,
+    pub width: u32,
+    pub height: u32,
+    pub input_rowbytes: u32,
+    pub output_rowbytes: u32,
+    pub mode: CudaBgra128Mode,
+}
+
+pub fn process_bgra128_pitched(job: CudaBgra128Job) -> Result<(), String> {
+    if job.width == 0 || job.height == 0 {
+        return Ok(());
+    }
+    if job.context.is_null() || job.input.is_null() || job.output.is_null() {
+        return Err("CUDA job contains a null context/input/output pointer".to_string());
+    }
+
     let driver = driver()?;
     unsafe {
         check((driver.cu_init)(0), "cuInit")?;
-        check((driver.cu_ctx_set_current)(context), "cuCtxSetCurrent")?;
+        check((driver.cu_ctx_set_current)(job.context), "cuCtxSetCurrent")?;
 
-        let mut input_param = input as u64;
-        let mut output_param = output as u64;
-        let mut width_param = width;
-        let mut height_param = height;
-        let mut input_rowbytes_param = input_rowbytes;
-        let mut output_rowbytes_param = output_rowbytes;
-        let mut mode_param = mode;
+        let mut input_param = job.input as u64;
+        let mut output_param = job.output as u64;
+        let mut width_param = job.width;
+        let mut height_param = job.height;
+        let mut input_rowbytes_param = job.input_rowbytes;
+        let mut output_rowbytes_param = job.output_rowbytes;
+        let mut mode_param = job.mode.kernel_mode();
         let mut params = [
             (&mut input_param as *mut u64).cast::<c_void>(),
             (&mut output_param as *mut u64).cast::<c_void>(),
@@ -63,8 +94,8 @@ pub fn process_bgra128_pitched(
 
         let block_x = 16u32;
         let block_y = 16u32;
-        let grid_x = width.div_ceil(block_x);
-        let grid_y = height.div_ceil(block_y);
+        let grid_x = job.width.div_ceil(block_x);
+        let grid_y = job.height.div_ceil(block_y);
         check(
             (driver.cu_launch_kernel)(
                 driver.function,
@@ -75,14 +106,14 @@ pub fn process_bgra128_pitched(
                 block_y,
                 1,
                 0,
-                stream,
+                job.stream,
                 params.as_mut_ptr(),
                 std::ptr::null_mut(),
             ),
             "cuLaunchKernel",
         )?;
         check(
-            (driver.cu_stream_synchronize)(stream),
+            (driver.cu_stream_synchronize)(job.stream),
             "cuStreamSynchronize",
         )?;
     }

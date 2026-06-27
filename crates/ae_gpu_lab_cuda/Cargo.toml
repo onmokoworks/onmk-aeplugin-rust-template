@@ -1,0 +1,8 @@
+[package]
+name = "ae_gpu_lab_cuda"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+libloading.workspace = true

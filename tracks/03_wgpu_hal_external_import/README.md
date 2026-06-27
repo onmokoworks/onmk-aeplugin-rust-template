@@ -199,6 +199,12 @@ Current CUDA modes:
 - `CUDA Copy Output`: pitch-aware BGRA128 input-to-output copy.
 - `CUDA Invert Output`: pitch-aware RGB invert, preserving alpha.
 
+Implementation note:
+
+- The reusable CUDA Driver API/PTX code lives in `crates/ae_gpu_lab_cuda`.
+- `AeGpuProbe` only gathers AE-specific context, stream, world pointers, extents,
+  and row strides before calling the CUDA crate.
+
 Current limitations:
 
 - It synchronizes the AE CUDA stream after launch for easier first-pass debugging.

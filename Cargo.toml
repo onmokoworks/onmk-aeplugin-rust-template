@@ -2,6 +2,7 @@
 members = [
     "crates/ae_gpu_lab_core",
     "crates/ae_gpu_lab_cli",
+    "crates/ae_gpu_lab_cuda",
     "crates/ae_gpu_lab_native_probe",
     "crates/ae_gpu_lab_plugin",
     "crates/ae_gpu_lab_probe_plugin",

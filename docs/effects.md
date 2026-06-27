@@ -32,6 +32,7 @@ FrameRef
 Processor
   CpuProcessor
   WgpuUploadReadbackProcessor
+  CudaNativeProcessor
   AeNativeProcessor
   ExperimentalExternalImportProcessor
 ```
