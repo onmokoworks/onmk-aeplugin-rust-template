@@ -112,6 +112,69 @@ Next branch:
 - For product-like speed on this machine: add a `cuda_native_probe` / CUDA copy kernel first.
 - For `wgpu-hal` import research: try to force/observe a DirectX GPU framework, or run the same probe on macOS/Metal.
 
+## Metal / Apple Silicon Hypothesis
+
+Metal on Apple Silicon is the most promising first target for `wgpu-hal` external
+import research.
+
+Reasoning:
+
+- AE's official GPU path on Apple Silicon is expected to use Metal.
+- `wgpu` on macOS normally uses the Metal backend.
+- Apple Silicon has less GPU/API/driver variation than Windows.
+- There is no CUDA-style alternate GPU universe on Apple Silicon.
+- If AE hands the plug-in a real Metal texture or buffer, the active `wgpu-hal`
+  backend may be the same API family as the host resource.
+
+This does **not** mean that a working Metal import becomes generally portable.
+It only means the backend mismatch problem is likely smaller than on Windows/NVIDIA.
+
+Expected probe questions:
+
+- Does AE report `what_gpu = Metal` in `GpuDeviceSetup`, `SmartPreRender`, and
+  `SmartRenderGpu`?
+- What do `platformPV`, `devicePV`, `contextPV`, and `command_queuePV` contain on
+  macOS?
+- Is `gpu_world_data` an `MTLTexture`, `MTLBuffer`, raw device pointer, or
+  another AE-managed wrapper?
+- Does `PixelDataSuite` expose a Metal-specific texture/buffer pointer for the
+  same world?
+- Does the input and output world share the same Metal device as the `wgpu`
+  adapter/device?
+- Is the world format `RGBA16Float`, `RGBA32Float`, BGRA, or an AE-specific
+  layout?
+- Who owns synchronization between AE's command buffer/queue and any wrapped
+  `wgpu-hal` resource?
+- Can the AE world outlive the imported/wrapped `wgpu-hal` object for the
+  duration of the render pass?
+
+Practical sequence:
+
+```text
+macOS / Apple Silicon AE probe
+  -> log Metal device/queue/world facts
+  -> convert to ExternalFrameRef
+  -> run Metal preflight only
+  -> try native Metal copy first
+  -> attempt read-only wgpu-hal Metal import only after sync/ownership is clear
+```
+
+Important distinction:
+
+```text
+Native Metal backend
+  AE Metal world -> Metal compute/render code
+  likely useful as a practical fast path
+
+wgpu-hal Metal import
+  AE Metal world -> unsafe wrapper/import -> wgpu-hal/wgpu-side processing
+  research path; backend-specific; not automatically portable
+```
+
+The reusable template asset should be the probe data model and preflight
+boundary. The actual Metal import code should be treated as replaceable unsafe
+backend code.
+
 ## CUDA Copy Probe
 
 `AeGpuProbe` now includes an optional first native write test:
