@@ -7,7 +7,9 @@ pub mod wgpu_backend;
 pub use backend::{BackendTiming, RenderBackend, RenderReport};
 pub use cpu::render_cpu;
 pub use cpu_backend::CpuBackend;
-pub use frame::{FrameRgba8, LabParams};
+pub use frame::{
+    FrameDesc, FrameLayoutError, FrameRgba8, FrameView, FrameViewMut, LabParams, PixelFormat,
+};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum BenchEffect {

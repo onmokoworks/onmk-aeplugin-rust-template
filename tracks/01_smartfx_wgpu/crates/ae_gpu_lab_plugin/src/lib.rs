@@ -1,5 +1,8 @@
 use ae_gpu_lab_core::wgpu_backend::WgpuUploadReadback;
-use ae_gpu_lab_core::{render_cpu, BackendTiming, BenchEffect, FrameRgba8, LabParams};
+use ae_gpu_lab_core::{
+    render_cpu, BackendTiming, BenchEffect, FrameDesc, FrameRgba8, FrameView, FrameViewMut,
+    LabParams, PixelFormat,
+};
 use after_effects as ae;
 use std::panic::catch_unwind;
 use std::sync::{Mutex, OnceLock};
@@ -110,9 +113,9 @@ impl AdobePluginGlobal for Plugin {
             ae::Command::SmartRender { extra } => {
                 smart_render(&extra, params)?;
             }
-            ae::Command::SmartRenderGpu { extra } => {
-                smart_render(&extra, params)?;
-            }
+            // This track is a CPU SmartFX effect that runs its own wgpu work.
+            // AE official GPU worlds belong to track 02 and have no CPU buffer.
+            ae::Command::SmartRenderGpu { .. } => return Err(ae::Error::Generic),
             _ => {}
         }
         Ok(())
@@ -193,9 +196,9 @@ fn render_layer(
     out_layer: &mut ae::Layer,
 ) -> Result<(), ae::Error> {
     let pp = get_params(params)?;
-    let frame = layer_to_rgba(in_layer);
+    let frame = layer_to_rgba(in_layer)?;
     let out = dispatch(pp, &frame);
-    rgba_to_layer(&out, out_layer);
+    rgba_to_layer(&out, out_layer)?;
     Ok(())
 }
 
@@ -242,49 +245,33 @@ fn smart_render(
     Ok(())
 }
 
-fn layer_to_rgba(layer: &ae::Layer) -> FrameRgba8 {
-    let width = layer.width() as usize;
-    let height = layer.height() as usize;
-    let stride = layer.buffer_stride();
-    let src = layer.buffer();
-    let mut pixels = vec![0u8; width * height * 4];
-
-    for y in 0..height {
-        let src_row = y * stride;
-        for x in 0..width {
-            let si = src_row + x * 4;
-            let di = (y * width + x) * 4;
-            if si + 3 < src.len() {
-                pixels[di] = src[si + 1];
-                pixels[di + 1] = src[si + 2];
-                pixels[di + 2] = src[si + 3];
-                pixels[di + 3] = src[si];
-            }
-        }
-    }
-
-    FrameRgba8::new(width as u32, height as u32, pixels)
+fn layer_to_rgba(layer: &ae::Layer) -> Result<FrameRgba8, ae::Error> {
+    let desc = layer_desc(layer)?;
+    FrameView::new(desc, layer.buffer())
+        .map(FrameView::to_rgba8)
+        .map_err(|_| ae::Error::Generic)
 }
 
-fn rgba_to_layer(frame: &FrameRgba8, layer: &mut ae::Layer) {
-    let width = frame.width as usize;
-    let height = frame.height as usize;
-    let stride = layer.buffer_stride();
-    let dst = layer.buffer_mut();
+fn rgba_to_layer(frame: &FrameRgba8, layer: &mut ae::Layer) -> Result<(), ae::Error> {
+    let desc = layer_desc(layer)?;
+    FrameViewMut::new(desc, layer.buffer_mut())
+        .and_then(|mut view| view.write_rgba8(frame))
+        .map_err(|_| ae::Error::Generic)
+}
 
-    for y in 0..height {
-        let dst_row = y * stride;
-        for x in 0..width {
-            let si = (y * width + x) * 4;
-            let di = dst_row + x * 4;
-            if si + 3 < frame.pixels.len() && di + 3 < dst.len() {
-                dst[di] = frame.pixels[si + 3];
-                dst[di + 1] = frame.pixels[si];
-                dst[di + 2] = frame.pixels[si + 1];
-                dst[di + 3] = frame.pixels[si + 2];
-            }
-        }
-    }
+fn layer_desc(layer: &ae::Layer) -> Result<FrameDesc, ae::Error> {
+    let format = match layer.bit_depth() {
+        8 => PixelFormat::AeArgb8,
+        16 => PixelFormat::AeArgb16,
+        32 => PixelFormat::AeArgb32Float,
+        _ => return Err(ae::Error::Generic),
+    };
+    Ok(FrameDesc {
+        width: layer.width() as u32,
+        height: layer.height() as u32,
+        row_bytes: layer.buffer_stride(),
+        format,
+    })
 }
 
 #[derive(Clone, Copy, Debug)]
