@@ -49,43 +49,51 @@ preflight(ExternalFrameRef, active_backend) -> ImportPreflight
 ImportPreflight::validate()
 ```
 
-The current implementation only validates:
+The common preflight validates:
 
 - declared backend matches the active backend
 - format is not unknown
 - extent is nonzero
 - handle variant matches declared backend
+- row pitch and allocation size match the BGRA128 frame layout
 
-Next work:
+Implemented backend entry points:
 
-- Run the SmartFX + wgpu path inside AE before attempting unsafe import.
-- Wire AE official GPU probe data into `AeGpuFrameProbe`.
-- Decide whether the first unsafe PoC should target D3D12 or Metal.
-- Replace the D3D12 or Metal placeholder importer with a backend-specific unsafe PoC.
+- D3D12: retain and inspect `ID3D12Resource`, require BUFFER dimension and the
+  exact same `ID3D12Device`, then call `buffer_from_raw` and
+  `create_buffer_from_hal`.
+- Metal: retain `MTLBuffer`, require the exact same `MTLDevice`, then call
+  `buffer_from_raw` and `create_buffer_from_hal`.
+- Common compute: pitch-aware BGRA128 copy/invert encoder for imported input and
+  output buffers.
+- D3D12 smoke: simulated external resource -> import -> WGSL compute -> readback,
+  verified on Windows without AE.
+- Metal smoke: same-device import test compiles for `aarch64-apple-darwin` and
+  awaits execution on a Mac.
+
+See [the Japanese interop findings](../../docs/wgpu-hal-interop.ja.md) for the
+current feasibility decision and remaining host-side probes.
 
 Backend-specific entry points:
 
-- `src/d3d12.rs`: D3D12 import plan and placeholder importer
-- `src/metal.rs`: Metal import plan and placeholder importer
+- `src/d3d12.rs`: D3D12 preflight and real same-device buffer wrapper
+- `src/metal.rs`: Metal preflight and real same-device buffer wrapper
+- `src/compute.rs`: shared pitched BGRA128 compute encoder
 
-These importers intentionally return "not implemented" after preflight. They are present to make synchronization, ownership, and write-access decisions explicit before any real resource wrapping happens.
+The generic `ExternalImporter` token path remains a planning API. Real resource
+ownership is returned by the backend-specific `import_buffer_into_wgpu` methods.
 
 ## Suggested Real-machine Test Order
 
-1. Run the CLI benchmark outside AE.
-   Confirm `copy` checksum and upload/readback timing.
-
-2. Build/load the SmartFX + wgpu plugin in AE.
-   Confirm device creation, repeated renders, plugin reload, and fallback behavior.
-
-3. Add an AE official GPU probe that only logs framework/device/frame facts.
-   Do not import the frame yet.
-
-4. Convert logged frame facts into `AeGpuFrameProbe` and `ExternalFrameRef`.
-   Confirm preflight results for D3D12 on Windows and Metal on macOS.
-
-5. Attempt the first unsafe import PoC on one backend only.
-   Prefer read-only input import before trying write/read-write output.
+1. On macOS, run the official GPU probe without import and identify the exact
+   Objective-C classes behind `devicePV`, `command_queuePV`, and
+   `GetGPUWorldData`.
+2. Run the ignored Metal same-device smoke test on Apple Silicon.
+3. If the GPU world is an `MTLBuffer`, connect the existing Metal wrapper in
+   read-only mode and wait for completion before returning to AE.
+4. On Windows, only enable D3D12 import when AE selects DirectX and the resource
+   and wgpu device report the same `ID3D12Device` identity.
+5. Keep CUDA as the native official-GPU backend when AE selects CUDA.
 
 ## First Hot Probe Result On Windows/NVIDIA
 
@@ -105,7 +113,7 @@ Interpretation:
 
 - AE is providing the official GPU SmartRender path.
 - On this Windows/NVIDIA machine, AE selects CUDA, not DirectX.
-- The hot probe currently does not write the GPU output world, so black output is expected.
+- The CUDA copy/invert path now writes the GPU output world through the Driver API.
 - This is a native CUDA interop entry point, not a direct `wgpu-hal` entry point.
 
 Implication for track 03:

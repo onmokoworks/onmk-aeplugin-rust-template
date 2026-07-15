@@ -4,6 +4,11 @@ use crate::{
 };
 use anyhow::{bail, Result};
 
+#[cfg(target_os = "macos")]
+use crate::{ExternalHandle, ExternalResourceKind};
+#[cfg(target_os = "macos")]
+use metal::foreign_types::{ForeignType, ForeignTypeRef};
+
 #[derive(Clone, Copy, Debug)]
 pub struct MetalImportPlan {
     pub synchronization_defined: bool,
@@ -16,13 +21,83 @@ pub struct MetalExternalImporter {
     pub plan: MetalImportPlan,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct MetalExternalContext {
+    pub device: *mut core::ffi::c_void,
+    pub command_queue: *mut core::ffi::c_void,
+}
+
+impl MetalExternalImporter {
+    /// Wraps an AE-owned Metal buffer as a `wgpu::Buffer` without copying.
+    ///
+    /// # Safety
+    ///
+    /// `context.device`, `context.command_queue`, and the frame handle must be
+    /// valid retained-by-AE Objective-C objects for the duration of this call.
+    /// The caller must order AE queue work before wgpu submission and wait for
+    /// all wgpu work before returning the output world to AE.
+    #[cfg(target_os = "macos")]
+    pub unsafe fn import_buffer_into_wgpu(
+        &self,
+        device: &wgpu::Device,
+        context: MetalExternalContext,
+        frame: ExternalFrameRef,
+        usage: wgpu::BufferUsages,
+    ) -> Result<wgpu::Buffer> {
+        self.backend_preflight(frame).validate()?;
+        if context.device.is_null() || context.command_queue.is_null() {
+            bail!("Metal device or command queue pointer is null");
+        }
+        if frame.desc.resource_kind != ExternalResourceKind::Buffer {
+            bail!("Metal external resource is not declared as a buffer");
+        }
+        let ExternalHandle::MetalBuffer(raw_pointer) = frame.handle else {
+            bail!("Metal buffer import requires an MTLBuffer pointer");
+        };
+        if raw_pointer.is_null() {
+            bail!("Metal buffer pointer is null");
+        }
+
+        let ae_device = unsafe { metal::DeviceRef::from_ptr(context.device.cast()) };
+        let hal_device = unsafe { device.as_hal::<wgpu_hal::api::Metal>() }
+            .ok_or_else(|| anyhow::anyhow!("wgpu device is not using the Metal backend"))?;
+        let wgpu_device = hal_device.raw_device().lock();
+        if wgpu_device.as_ptr() != ae_device.as_ptr() {
+            bail!("AE and wgpu are using different MTLDevice objects");
+        }
+        drop(wgpu_device);
+
+        let borrowed_buffer = unsafe { metal::BufferRef::from_ptr(raw_pointer.cast()) };
+        if borrowed_buffer.length() < frame.desc.byte_len as u64 {
+            bail!(
+                "AE Metal buffer has {} bytes but frame declares {}",
+                borrowed_buffer.length(),
+                frame.desc.byte_len
+            );
+        }
+        let retained_buffer = borrowed_buffer.to_owned();
+        let hal_buffer = unsafe {
+            wgpu_hal::metal::Device::buffer_from_raw(retained_buffer, frame.desc.byte_len as u64)
+        };
+        let descriptor = wgpu::BufferDescriptor {
+            label: Some("AE external Metal GPU world"),
+            size: frame.desc.byte_len as u64,
+            usage,
+            mapped_at_creation: false,
+        };
+        Ok(unsafe {
+            device.create_buffer_from_hal::<wgpu_hal::api::Metal>(hal_buffer, &descriptor)
+        })
+    }
+}
+
 impl ExternalImporter for MetalExternalImporter {
     fn active_backend(&self) -> ExternalBackend {
         ExternalBackend::Metal
     }
 
     fn import_frame_unchecked(&self, _frame: ExternalFrameRef) -> Result<ImportedFrameToken> {
-        bail!("Metal wgpu-hal external import is not implemented yet")
+        bail!("generic token API does not own Metal resources; use import_buffer_into_wgpu")
     }
 }
 

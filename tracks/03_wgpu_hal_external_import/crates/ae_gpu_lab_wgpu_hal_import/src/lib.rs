@@ -1,9 +1,10 @@
 //! Experimental wgpu-hal external import boundary.
 //!
-//! This crate is the entrance to zero-copy interop research. It does not import
-//! any real resource yet. It defines the minimum information that a real import
-//! attempt must prove before touching `wgpu-hal` unsafe APIs.
+//! This crate is the isolated zero-copy interop experiment. It validates the
+//! host resource contract, wraps same-device D3D12 and Metal buffers through
+//! `wgpu-hal`, and provides a shared pitched BGRA128 compute encoder.
 
+pub mod compute;
 pub mod d3d12;
 pub mod metal;
 

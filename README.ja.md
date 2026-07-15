@@ -35,7 +35,7 @@ tracks/02_native_official_gpu_probe/crates/ae_gpu_lab_probe_plugin
   AE official GPU path probeとnative CUDA実験。AeGpuProbe.aexを生成
 
 tracks/03_wgpu_hal_external_import/crates/ae_gpu_lab_wgpu_hal_import
-  wgpu-hal external importのpreflight研究
+  D3D12 / Metal buffer import、preflight、共通BGRA128 compute
 ```
 
 ## ビルド
@@ -79,3 +79,4 @@ MediaCoreへのコピーでは管理者権限が要求されます。
 
 - [Prior Art](docs/prior-art.md)
 - [Benchmark Effect Notes](docs/effects.md)
+- [wgpu-hal External Import 調査](docs/wgpu-hal-interop.ja.md)

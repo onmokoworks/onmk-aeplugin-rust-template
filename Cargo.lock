@@ -60,7 +60,13 @@ version = "0.1.0"
 dependencies = [
  "ae_gpu_lab_native_probe",
  "anyhow",
+ "bytemuck",
+ "metal",
+ "pollster",
+ "wgpu",
  "wgpu-hal",
+ "windows",
+ "windows-core",
 ]
 
 [[package]]
