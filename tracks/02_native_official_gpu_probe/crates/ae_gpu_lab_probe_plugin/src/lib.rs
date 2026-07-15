@@ -1,5 +1,8 @@
 use ae_gpu_lab_cuda::{CudaBgra128Job, CudaBgra128Mode};
-use ae_gpu_lab_native_probe::{AeGpuDeviceProbe, AeGpuFramework};
+use ae_gpu_lab_native_probe::{
+    AeGpuDeviceContext, AeGpuDeviceHandles, AeGpuDeviceProbe, AeGpuFrameProbe, AeGpuFramework,
+    NativeFrameAccess, NativeHandle, NativePixelFormat, NativeProbeStatus, NativeRenderJob,
+};
 use after_effects as ae;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -197,10 +200,69 @@ fn cuda_render_gpu_worlds(
             ae::Error::Generic
         })?;
 
+    let device_probe = AeGpuDeviceProbe {
+        framework: map_framework(extra.what_gpu()),
+        device_index: extra.device_index() as i32,
+        can_render_f32: true,
+    };
+    let device = AeGpuDeviceContext {
+        probe: device_probe,
+        handles: AeGpuDeviceHandles {
+            platform: info.platformPV,
+            device: info.devicePV,
+            context: info.contextPV,
+            command_queue: info.command_queuePV,
+        },
+    };
+
     let width = input.width().min(output.width());
     let height = input.height().min(output.height());
-    let context = info.contextPV;
-    let stream = info.command_queuePV;
+    let input_size = gpu_suite
+        .gpu_world_size(
+            in_data.effect_ref(),
+            WorldPtr(ae::AsMutPtr::as_mut_ptr(&mut input)),
+        )
+        .map_err(|_| ae::Error::Generic)?;
+    let output_size = gpu_suite
+        .gpu_world_size(
+            in_data.effect_ref(),
+            WorldPtr(ae::AsMutPtr::as_mut_ptr(&mut output)),
+        )
+        .map_err(|_| ae::Error::Generic)?;
+    let job = NativeRenderJob {
+        device,
+        input: AeGpuFrameProbe {
+            device: device_probe,
+            width: width as u32,
+            height: height as u32,
+            row_bytes: input.row_bytes() as usize,
+            byte_len: input_size,
+            format: NativePixelFormat::Bgra32Float,
+            access: NativeFrameAccess::ReadOnly,
+            handle: NativeHandle::CudaDevicePtr(input_ptr as u64),
+        },
+        output: AeGpuFrameProbe {
+            device: device_probe,
+            width: width as u32,
+            height: height as u32,
+            row_bytes: output.row_bytes() as usize,
+            byte_len: output_size,
+            format: NativePixelFormat::Bgra32Float,
+            access: NativeFrameAccess::WriteOnly,
+            handle: NativeHandle::CudaDevicePtr(output_ptr as u64),
+        },
+    };
+    let classification = job.classify();
+    append_log(&format!(
+        "NativeRenderJob class={classification:?} job={job:?}"
+    ));
+    if classification != NativeProbeStatus::ReadyForBackend {
+        let _ = cb.checkin_layer_pixels(0);
+        return Err(ae::Error::Generic);
+    }
+
+    let context = job.device.handles.context;
+    let stream = job.device.handles.command_queue;
     match ae_gpu_lab_cuda::process_bgra128_pitched(CudaBgra128Job {
         context,
         stream,
@@ -208,8 +270,8 @@ fn cuda_render_gpu_worlds(
         output: output_ptr,
         width: width as u32,
         height: height as u32,
-        input_rowbytes: input.row_bytes() as u32,
-        output_rowbytes: output.row_bytes() as u32,
+        input_rowbytes: job.input.row_bytes as u32,
+        output_rowbytes: job.output.row_bytes as u32,
         mode,
     }) {
         Ok(()) => {

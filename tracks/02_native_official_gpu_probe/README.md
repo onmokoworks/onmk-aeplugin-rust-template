@@ -48,18 +48,32 @@ AeGpuDeviceProbe
 
 AeGpuFrameProbe
   device
-  width / height
+  width / height / row_bytes / byte_len
   format
   access
   native handle
+
+AeGpuDeviceContext
+  framework / device index
+  platform / device / context / command queue handles
+
+NativeRenderJob
+  validated device context
+  read-capable input frame
+  write-capable output frame
 ```
 
 `AeGpuFrameProbe::classify()` rejects unsupported frameworks, missing frame handles, and mismatched handle/framework pairs before any backend-specific unsafe code runs.
+
+The current contract is buffer-first. AE GPU SmartRender uses
+`PF_PixelFormat_GPU_BGRA128`, so a GPU world is modeled as a pitched float buffer
+unless a real-machine probe proves that a backend exposes a texture.
 
 Do not put wgpu-hal import code here. This track only classifies AE/native GPU state.
 
 Next work:
 
-- Wire `PF_Cmd_GPU_DEVICE_SETUP` into `AeGpuDeviceProbe`.
-- Wire `PF_Cmd_GPU_SMART_RENDER_GPU` input/output checkout into `AeGpuFrameProbe`.
-- Record exact AE/Premiere SDK suite calls needed to obtain native device/context/queue/frame handles.
+- Add native Metal BGRA128 copy/invert using `MTLBuffer`.
+- Add a DirectX implementation only after the exact `ID3D12Resource` shape and
+  resource state are observed.
+- Keep the existing CUDA Driver API path as the first working native backend.

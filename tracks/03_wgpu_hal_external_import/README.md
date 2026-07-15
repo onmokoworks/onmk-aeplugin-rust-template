@@ -18,6 +18,16 @@ Minimum questions before real import:
 - Is the resource read-only, write-only, or read-write for this pass?
 - Can the resource outlive the wgpu-hal object that wraps it?
 
+Current correction from SDK inspection:
+
+- AE GPU SmartRender advertises `PF_PixelFormat_GPU_BGRA128`.
+- `GetGPUWorldData` should therefore be treated as a pitched float buffer first,
+  not assumed to be a 2D texture.
+- CUDA maps naturally to a device pointer.
+- DirectX device allocations are documented as `ID3D12Resource*` objects.
+- Metal must be probed as an `MTLBuffer` candidate before attempting an
+  `MTLTexture` path.
+
 Initial flow:
 
 ```text

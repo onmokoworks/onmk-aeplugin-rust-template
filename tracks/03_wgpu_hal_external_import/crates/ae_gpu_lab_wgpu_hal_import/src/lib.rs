@@ -27,6 +27,7 @@ pub enum ExternalFormat {
     Bgra8Unorm,
     Rgba16Float,
     Rgba32Float,
+    Bgra32Float,
     Unknown(u32),
 }
 
@@ -38,18 +39,28 @@ pub enum ExternalAccess {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ExternalResourceKind {
+    Buffer,
+    Texture2D,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ExternalFrameDesc {
     pub backend: ExternalBackend,
     pub width: u32,
     pub height: u32,
+    pub row_bytes: usize,
+    pub byte_len: usize,
     pub format: ExternalFormat,
     pub access: ExternalAccess,
+    pub resource_kind: ExternalResourceKind,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ExternalHandle {
     D3D11Texture2D(*mut core::ffi::c_void),
     D3D12Resource(*mut core::ffi::c_void),
+    MetalBuffer(*mut core::ffi::c_void),
     MetalTexture(*mut core::ffi::c_void),
     VulkanImage(u64),
     CudaDevicePtr(u64),
@@ -74,6 +85,7 @@ pub struct ImportPreflight {
     pub has_matching_backend: bool,
     pub has_supported_format: bool,
     pub has_nonzero_extent: bool,
+    pub has_valid_layout: bool,
     pub handle_matches_backend: bool,
 }
 
@@ -111,6 +123,9 @@ impl ImportPreflight {
         }
         if !self.has_nonzero_extent {
             bail!("external resource extent is empty");
+        }
+        if !self.has_valid_layout {
+            bail!("external resource row pitch or allocation size is invalid");
         }
         if !self.handle_matches_backend {
             bail!("external handle type does not match its declared backend");
@@ -164,6 +179,7 @@ pub fn preflight(frame: ExternalFrameRef, active_backend: ExternalBackend) -> Im
         has_matching_backend: frame.desc.backend == active_backend,
         has_supported_format: !matches!(frame.desc.format, ExternalFormat::Unknown(_)),
         has_nonzero_extent: frame.desc.width > 0 && frame.desc.height > 0,
+        has_valid_layout: has_valid_layout(frame.desc),
         handle_matches_backend: handle_matches_backend(frame.handle, frame.desc.backend),
     }
 }
@@ -194,6 +210,7 @@ pub fn from_ae_probe(probe: AeGpuFrameProbe) -> Option<ExternalFrameRef> {
         NativePixelFormat::Bgra8Unorm => ExternalFormat::Bgra8Unorm,
         NativePixelFormat::Rgba16Float => ExternalFormat::Rgba16Float,
         NativePixelFormat::Rgba32Float => ExternalFormat::Rgba32Float,
+        NativePixelFormat::Bgra32Float => ExternalFormat::Bgra32Float,
         NativePixelFormat::Unknown(v) => ExternalFormat::Unknown(v),
     };
 
@@ -206,6 +223,7 @@ pub fn from_ae_probe(probe: AeGpuFrameProbe) -> Option<ExternalFrameRef> {
     let handle = match probe.handle {
         NativeHandle::D3D11Texture2D(ptr) => ExternalHandle::D3D11Texture2D(ptr),
         NativeHandle::D3D12Resource(ptr) => ExternalHandle::D3D12Resource(ptr),
+        NativeHandle::MetalBuffer(ptr) => ExternalHandle::MetalBuffer(ptr),
         NativeHandle::MetalTexture(ptr) => ExternalHandle::MetalTexture(ptr),
         NativeHandle::CudaDevicePtr(ptr) => ExternalHandle::CudaDevicePtr(ptr),
         NativeHandle::Unsupported => return None,
@@ -216,8 +234,19 @@ pub fn from_ae_probe(probe: AeGpuFrameProbe) -> Option<ExternalFrameRef> {
             backend,
             width: probe.width,
             height: probe.height,
+            row_bytes: probe.row_bytes,
+            byte_len: probe.byte_len,
             format,
             access,
+            resource_kind: match probe.handle {
+                NativeHandle::D3D11Texture2D(_) | NativeHandle::MetalTexture(_) => {
+                    ExternalResourceKind::Texture2D
+                }
+                NativeHandle::D3D12Resource(_)
+                | NativeHandle::MetalBuffer(_)
+                | NativeHandle::CudaDevicePtr(_) => ExternalResourceKind::Buffer,
+                NativeHandle::Unsupported => return None,
+            },
         },
         handle,
     })
@@ -228,10 +257,27 @@ fn handle_matches_backend(handle: ExternalHandle, backend: ExternalBackend) -> b
         (handle, backend),
         (ExternalHandle::D3D11Texture2D(_), ExternalBackend::D3D11)
             | (ExternalHandle::D3D12Resource(_), ExternalBackend::D3D12)
+            | (ExternalHandle::MetalBuffer(_), ExternalBackend::Metal)
             | (ExternalHandle::MetalTexture(_), ExternalBackend::Metal)
             | (ExternalHandle::VulkanImage(_), ExternalBackend::Vulkan)
             | (ExternalHandle::CudaDevicePtr(_), ExternalBackend::Cuda)
     )
+}
+
+fn has_valid_layout(desc: ExternalFrameDesc) -> bool {
+    let bytes_per_pixel = match desc.format {
+        ExternalFormat::Rgba8Unorm | ExternalFormat::Bgra8Unorm => 4,
+        ExternalFormat::Rgba16Float => 8,
+        ExternalFormat::Rgba32Float | ExternalFormat::Bgra32Float => 16,
+        ExternalFormat::Unknown(_) => return false,
+    };
+    let Some(minimum_row_bytes) = (desc.width as usize).checked_mul(bytes_per_pixel) else {
+        return false;
+    };
+    let Some(required_len) = desc.row_bytes.checked_mul(desc.height as usize) else {
+        return false;
+    };
+    desc.row_bytes >= minimum_row_bytes && desc.byte_len >= required_len
 }
 
 #[cfg(test)]
@@ -249,6 +295,8 @@ mod tests {
             },
             width: 3840,
             height: 2160,
+            row_bytes: 3840 * 8,
+            byte_len: 3840 * 2160 * 8,
             format: NativePixelFormat::Rgba16Float,
             access: NativeFrameAccess::ReadWrite,
             handle: NativeHandle::MetalTexture(0x1234usize as *mut core::ffi::c_void),
@@ -270,8 +318,11 @@ mod tests {
                 backend: ExternalBackend::D3D12,
                 width: 1920,
                 height: 1080,
+                row_bytes: 1920 * 16,
+                byte_len: 1920 * 1080 * 16,
                 format: ExternalFormat::Rgba32Float,
                 access: ExternalAccess::ReadWrite,
+                resource_kind: ExternalResourceKind::Buffer,
             },
             handle: ExternalHandle::D3D12Resource(0x1234usize as *mut core::ffi::c_void),
         };
@@ -289,8 +340,11 @@ mod tests {
                 backend: ExternalBackend::D3D12,
                 width: 1280,
                 height: 720,
+                row_bytes: 1280 * 16,
+                byte_len: 1280 * 720 * 16,
                 format: ExternalFormat::Rgba32Float,
                 access: ExternalAccess::ReadWrite,
+                resource_kind: ExternalResourceKind::Buffer,
             },
             handle: ExternalHandle::D3D12Resource(0x1234usize as *mut core::ffi::c_void),
         };
@@ -310,8 +364,11 @@ mod tests {
                 backend: ExternalBackend::D3D12,
                 width: 1280,
                 height: 720,
+                row_bytes: 1280 * 16,
+                byte_len: 1280 * 720 * 16,
                 format: ExternalFormat::Rgba32Float,
                 access: ExternalAccess::ReadOnly,
+                resource_kind: ExternalResourceKind::Buffer,
             },
             handle: ExternalHandle::D3D12Resource(0x1234usize as *mut core::ffi::c_void),
         };

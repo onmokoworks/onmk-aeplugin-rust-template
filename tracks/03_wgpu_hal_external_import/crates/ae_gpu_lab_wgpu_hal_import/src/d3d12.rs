@@ -40,7 +40,9 @@ impl BackendExternalImporter for D3D12ExternalImporter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ExternalAccess, ExternalFormat, ExternalFrameDesc, ExternalHandle};
+    use crate::{
+        ExternalAccess, ExternalFormat, ExternalFrameDesc, ExternalHandle, ExternalResourceKind,
+    };
 
     #[test]
     fn d3d12_plan_requires_sync_and_ownership_before_import() {
@@ -56,8 +58,11 @@ mod tests {
                 backend: ExternalBackend::D3D12,
                 width: 1920,
                 height: 1080,
+                row_bytes: 1920 * 16,
+                byte_len: 1920 * 1080 * 16,
                 format: ExternalFormat::Rgba32Float,
                 access: ExternalAccess::ReadOnly,
+                resource_kind: ExternalResourceKind::Buffer,
             },
             handle: ExternalHandle::D3D12Resource(0x1234usize as *mut core::ffi::c_void),
         };

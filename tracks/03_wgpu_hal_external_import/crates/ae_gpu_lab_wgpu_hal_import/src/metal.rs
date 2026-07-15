@@ -40,7 +40,9 @@ impl BackendExternalImporter for MetalExternalImporter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ExternalAccess, ExternalFormat, ExternalFrameDesc, ExternalHandle};
+    use crate::{
+        ExternalAccess, ExternalFormat, ExternalFrameDesc, ExternalHandle, ExternalResourceKind,
+    };
 
     #[test]
     fn metal_plan_accepts_readwrite_only_when_write_access_allowed() {
@@ -56,8 +58,11 @@ mod tests {
                 backend: ExternalBackend::Metal,
                 width: 1920,
                 height: 1080,
+                row_bytes: 1920 * 8,
+                byte_len: 1920 * 1080 * 8,
                 format: ExternalFormat::Rgba16Float,
                 access: ExternalAccess::ReadWrite,
+                resource_kind: ExternalResourceKind::Texture2D,
             },
             handle: ExternalHandle::MetalTexture(0x1234usize as *mut core::ffi::c_void),
         };
