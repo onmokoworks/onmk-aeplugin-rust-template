@@ -4,7 +4,9 @@ Purpose: prepare for AE's official GPU path and native backends without mixing i
 
 Current implementation lives in:
 
-- `crates/ae_gpu_lab_native_probe`
+- `tracks/02_native_official_gpu_probe/crates/ae_gpu_lab_native_probe`
+- `tracks/02_native_official_gpu_probe/crates/ae_gpu_lab_cuda`
+- `tracks/02_native_official_gpu_probe/crates/ae_gpu_lab_probe_plugin`
 
 Target AE concepts:
 

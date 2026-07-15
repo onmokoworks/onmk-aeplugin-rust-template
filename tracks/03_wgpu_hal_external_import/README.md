@@ -4,7 +4,7 @@ Purpose: isolated entrance for zero-copy interop research.
 
 Current implementation lives in:
 
-- `crates/ae_gpu_lab_wgpu_hal_import`
+- `tracks/03_wgpu_hal_external_import/crates/ae_gpu_lab_wgpu_hal_import`
 
 This track is intentionally separate because the import code will be unstable and backend-specific.
 
@@ -201,7 +201,8 @@ Current CUDA modes:
 
 Implementation note:
 
-- The reusable CUDA Driver API/PTX code lives in `crates/ae_gpu_lab_cuda`.
+- The reusable CUDA Driver API/PTX code lives in
+  `tracks/02_native_official_gpu_probe/crates/ae_gpu_lab_cuda`.
 - `AeGpuProbe` only gathers AE-specific context, stream, world pointers, extents,
   and row strides before calling the CUDA crate.
 

@@ -19,22 +19,22 @@ Adobe After Effects向けRustプラグインのテンプレート実験です。
 ## 構成
 
 ```text
-crates/ae_gpu_lab_core
+tracks/01_smartfx_wgpu/crates/ae_gpu_lab_core
   共通frame型、CPU effect、wgpu upload/readback backend
 
-crates/ae_gpu_lab_cli
+tracks/01_smartfx_wgpu/crates/ae_gpu_lab_cli
   AE外で動かすローカルbenchmark runner
 
-crates/ae_gpu_lab_cuda
+tracks/02_native_official_gpu_probe/crates/ae_gpu_lab_cuda
   AEに依存しないnative CUDA実験backend
 
-crates/ae_gpu_lab_plugin
+tracks/01_smartfx_wgpu/crates/ae_gpu_lab_plugin
   SmartFX + wgpu実験。AeGpuLab.aexを生成
 
-crates/ae_gpu_lab_probe_plugin
+tracks/02_native_official_gpu_probe/crates/ae_gpu_lab_probe_plugin
   AE official GPU path probeとnative CUDA実験。AeGpuProbe.aexを生成
 
-crates/ae_gpu_lab_wgpu_hal_import
+tracks/03_wgpu_hal_external_import/crates/ae_gpu_lab_wgpu_hal_import
   wgpu-hal external importのpreflight研究
 ```
 
@@ -101,22 +101,22 @@ This repository is not mainly about shipping one polished effect. The useful art
 ## Crates
 
 ```text
-crates/ae_gpu_lab_core
+tracks/01_smartfx_wgpu/crates/ae_gpu_lab_core
   Shared frame types, CPU effects, and wgpu upload/readback backend.
 
-crates/ae_gpu_lab_cli
+tracks/01_smartfx_wgpu/crates/ae_gpu_lab_cli
   Local benchmark runner outside AE.
 
-crates/ae_gpu_lab_cuda
+tracks/02_native_official_gpu_probe/crates/ae_gpu_lab_cuda
   Native CUDA experiment backend without an AE dependency.
 
-crates/ae_gpu_lab_plugin
+tracks/01_smartfx_wgpu/crates/ae_gpu_lab_plugin
   SmartFX + wgpu experiment. Builds AeGpuLab.aex.
 
-crates/ae_gpu_lab_probe_plugin
+tracks/02_native_official_gpu_probe/crates/ae_gpu_lab_probe_plugin
   AE official GPU path probe and native CUDA experiment. Builds AeGpuProbe.aex.
 
-crates/ae_gpu_lab_wgpu_hal_import
+tracks/03_wgpu_hal_external_import/crates/ae_gpu_lab_wgpu_hal_import
   Experimental external import boundary and preflight checks.
 ```
 

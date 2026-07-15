@@ -1,16 +1,16 @@
 [workspace]
 members = [
-    "crates/ae_gpu_lab_core",
-    "crates/ae_gpu_lab_cli",
-    "crates/ae_gpu_lab_cuda",
-    "crates/ae_gpu_lab_native_probe",
-    "crates/ae_gpu_lab_plugin",
-    "crates/ae_gpu_lab_probe_plugin",
-    "crates/ae_gpu_lab_wgpu_hal_import",
+    "tracks/01_smartfx_wgpu/crates/ae_gpu_lab_core",
+    "tracks/01_smartfx_wgpu/crates/ae_gpu_lab_cli",
+    "tracks/01_smartfx_wgpu/crates/ae_gpu_lab_plugin",
+    "tracks/02_native_official_gpu_probe/crates/ae_gpu_lab_cuda",
+    "tracks/02_native_official_gpu_probe/crates/ae_gpu_lab_native_probe",
+    "tracks/02_native_official_gpu_probe/crates/ae_gpu_lab_probe_plugin",
+    "tracks/03_wgpu_hal_external_import/crates/ae_gpu_lab_wgpu_hal_import",
 ]
 default-members = [
-    "crates/ae_gpu_lab_core",
-    "crates/ae_gpu_lab_cli",
+    "tracks/01_smartfx_wgpu/crates/ae_gpu_lab_core",
+    "tracks/01_smartfx_wgpu/crates/ae_gpu_lab_cli",
 ]
 resolver = "2"
 

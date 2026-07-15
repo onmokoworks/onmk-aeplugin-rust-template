@@ -4,9 +4,9 @@ Purpose: reusable Windows/macOS Rust GPU template where AE sees a normal SmartFX
 
 Current implementation lives in:
 
-- `crates/ae_gpu_lab_core`
-- `crates/ae_gpu_lab_cli`
-- `crates/ae_gpu_lab_plugin`
+- `tracks/01_smartfx_wgpu/crates/ae_gpu_lab_core`
+- `tracks/01_smartfx_wgpu/crates/ae_gpu_lab_cli`
+- `tracks/01_smartfx_wgpu/crates/ae_gpu_lab_plugin`
 
 Flow:
 

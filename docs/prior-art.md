@@ -123,8 +123,8 @@ Template implication:
 
 Current project boundary:
 
-- `crates/ae_gpu_lab_native_probe` models the AE/native GPU observation step.
-- `crates/ae_gpu_lab_wgpu_hal_import` converts native observations into an external frame reference and runs preflight checks.
+- `tracks/02_native_official_gpu_probe/crates/ae_gpu_lab_native_probe` models the AE/native GPU observation step.
+- `tracks/03_wgpu_hal_external_import/crates/ae_gpu_lab_wgpu_hal_import` converts native observations into an external frame reference and runs preflight checks.
 - No unsafe import is attempted until backend, format, extent, handle type, ownership, and synchronization questions are answered.
 
 ## 4. Shader Authoring Frameworks For AE
