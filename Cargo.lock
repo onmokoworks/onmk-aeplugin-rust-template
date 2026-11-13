@@ -15,6 +15,7 @@ dependencies = [
 name = "ae_gpu_lab_core"
 version = "0.1.0"
 dependencies = [
+ "ae_plugin_kit",
  "anyhow",
  "bytemuck",
  "pollster",

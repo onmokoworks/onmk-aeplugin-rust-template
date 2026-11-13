@@ -291,6 +291,40 @@ mod tests {
         roundtrip(PixelFormat::AeArgb32Float);
     }
 
+    // Read and write are checked separately against hand-computed bytes: a
+    // roundtrip alone would also pass if both sides premultiplied.
+    #[test]
+    fn partial_alpha_argb8_decodes_straight() {
+        let desc = FrameDesc::packed(1, 1, PixelFormat::AeArgb8).unwrap();
+        let decoded = FrameView::new(desc, &[128, 255, 51, 0]).unwrap().to_rgba8();
+        assert_eq!(decoded.pixels, [255, 51, 0, 128]);
+    }
+
+    #[test]
+    fn partial_alpha_argb16_encodes_straight() {
+        let desc = FrameDesc::packed(1, 1, PixelFormat::AeArgb16).unwrap();
+        let mut storage = [0u8; 8];
+        FrameViewMut::new(desc, &mut storage)
+            .unwrap()
+            .write_rgba8(&FrameRgba8::new(1, 1, vec![255, 0, 0, 128]))
+            .unwrap();
+        let c = |i: usize| u16::from_ne_bytes([storage[i * 2], storage[i * 2 + 1]]);
+        // A = 128 * 32768 / 255 = 16448.25, rounded, R = 32768 (white is 32768, not alpha-scaled).
+        assert_eq!([c(0), c(1), c(2), c(3)], [16448, 32768, 0, 0]);
+    }
+
+    #[test]
+    fn partial_alpha_argb32f_encodes_straight() {
+        let desc = FrameDesc::packed(1, 1, PixelFormat::AeArgb32Float).unwrap();
+        let mut storage = [0u8; 16];
+        FrameViewMut::new(desc, &mut storage)
+            .unwrap()
+            .write_rgba8(&FrameRgba8::new(1, 1, vec![255, 255, 255, 51]))
+            .unwrap();
+        let c = |i: usize| f32::from_ne_bytes(storage[i * 4..i * 4 + 4].try_into().unwrap());
+        assert_eq!([c(0), c(1), c(2), c(3)], [0.2, 1.0, 1.0, 1.0]);
+    }
+
     #[test]
     fn rejects_short_rows_and_buffers() {
         let short_row = FrameDesc {
