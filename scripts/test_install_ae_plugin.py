@@ -69,7 +69,10 @@ class InstallerTests(unittest.TestCase):
                    f"{prefix}; & '{path}' {quoted}; exit $LASTEXITCODE"]
         else:
             cmd = ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(path), *args]
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180)
+        # Started from PowerShell 7 (e.g. CI), Windows PowerShell 5.1 inherits a
+        # PSModulePath it cannot load modules from; let it rebuild its default.
+        env = {k: v for k, v in os.environ.items() if k.upper() != 'PSMODULEPATH'}
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, env=env)
         out = result.stdout.decode(errors='replace')
         self.assertEqual(result.returncode == 0, ok, f'{script} {extra}: exit {result.returncode}\n{out[-3000:]}')
         return out

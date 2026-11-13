@@ -18,7 +18,12 @@ function Assert-AeClosed {
 
 function Get-Sha256([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
-    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    # .NET instead of Get-FileHash: works even when Windows PowerShell 5.1 is
+    # started from PowerShell 7 and inherits an incompatible PSModulePath.
+    $sha = [Security.Cryptography.SHA256]::Create()
+    $stream = [IO.File]::OpenRead($Path)
+    try { $bytes = $sha.ComputeHash($stream) } finally { $stream.Dispose(); $sha.Dispose() }
+    return (($bytes | ForEach-Object { $_.ToString('x2') }) -join '')
 }
 
 function Test-IsAdministrator {
