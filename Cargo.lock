@@ -40,6 +40,8 @@ name = "ae_gpu_lab_plugin"
 version = "0.1.0"
 dependencies = [
  "ae_gpu_lab_core",
+ "ae_plugin_build",
+ "ae_plugin_kit",
  "after-effects",
  "pipl",
 ]
@@ -50,6 +52,8 @@ version = "0.1.0"
 dependencies = [
  "ae_gpu_lab_cuda",
  "ae_gpu_lab_native_probe",
+ "ae_plugin_build",
+ "ae_plugin_kit",
  "after-effects",
  "pipl",
 ]
@@ -67,6 +71,31 @@ dependencies = [
  "wgpu-hal",
  "windows",
  "windows-core",
+]
+
+[[package]]
+name = "ae_minimal_plugin"
+version = "0.1.0"
+dependencies = [
+ "ae_plugin_build",
+ "ae_plugin_kit",
+ "after-effects",
+ "pipl",
+]
+
+[[package]]
+name = "ae_plugin_build"
+version = "0.1.0"
+dependencies = [
+ "pipl",
+ "winres",
+]
+
+[[package]]
+name = "ae_plugin_kit"
+version = "0.1.0"
+dependencies = [
+ "after-effects",
 ]
 
 [[package]]

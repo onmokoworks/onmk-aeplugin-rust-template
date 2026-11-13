@@ -2,6 +2,7 @@
 members = [
     "crates/ae_plugin_kit",
     "crates/ae_plugin_build",
+    "tracks/00_cpu_minimal/crates/ae_minimal_plugin",
     "tracks/01_smartfx_wgpu/crates/ae_gpu_lab_core",
     "tracks/01_smartfx_wgpu/crates/ae_gpu_lab_cli",
     "tracks/01_smartfx_wgpu/crates/ae_gpu_lab_plugin",
@@ -13,6 +14,7 @@ members = [
 default-members = [
     "crates/ae_plugin_kit",
     "crates/ae_plugin_build",
+    "tracks/00_cpu_minimal/crates/ae_minimal_plugin",
     "tracks/01_smartfx_wgpu/crates/ae_gpu_lab_core",
     "tracks/01_smartfx_wgpu/crates/ae_gpu_lab_cli",
 ]
