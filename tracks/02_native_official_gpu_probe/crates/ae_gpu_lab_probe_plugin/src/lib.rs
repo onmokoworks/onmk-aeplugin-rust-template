@@ -1,8 +1,13 @@
+#[cfg(windows)]
 use ae_gpu_lab_cuda::{CudaBgra128Job, CudaBgra128Mode};
+#[cfg(windows)]
 use ae_gpu_lab_native_probe::{
-    AeGpuDeviceContext, AeGpuDeviceHandles, AeGpuDeviceProbe, AeGpuFrameProbe, AeGpuFramework,
-    NativeFrameAccess, NativeHandle, NativePixelFormat, NativeProbeStatus, NativeRenderJob,
+    AeGpuDeviceContext, AeGpuDeviceHandles, AeGpuFrameProbe, NativeFrameAccess, NativeHandle,
+    NativePixelFormat, NativeProbeStatus, NativeRenderJob,
 };
+use ae_gpu_lab_native_probe::{AeGpuDeviceProbe, AeGpuFramework};
+use ae_plugin_kit::ae::world_layout;
+use ae_plugin_kit::with_checkouts;
 use after_effects as ae;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -103,7 +108,7 @@ impl AdobePluginGlobal for Plugin {
                 in_layer,
                 mut out_layer,
             } => {
-                copy_layer(&in_layer, &mut out_layer);
+                copy_layer(&in_layer, &mut out_layer)?;
             }
             ae::Command::SmartPreRender { mut extra } => {
                 let enabled = params.get(Params::EnableGpuProbe)?.as_checkbox()?.value();
@@ -135,27 +140,27 @@ impl AdobePluginGlobal for Plugin {
             ae::Command::SmartRenderGpu { extra } => {
                 let cuda_copy = params.get(Params::CudaCopyOutput)?.as_checkbox()?.value();
                 let cuda_invert = params.get(Params::CudaInvertOutput)?.as_checkbox()?.value();
-                let mode = if cuda_invert {
-                    CudaBgra128Mode::InvertRgb
-                } else {
-                    CudaBgra128Mode::Copy
-                };
                 append_log(&format!(
-                    "SmartRenderGpu what_gpu={:?} device={} bit_depth={} cuda_copy={} cuda_invert={} mode={:?} note=copy_is_default",
+                    "SmartRenderGpu what_gpu={:?} device={} bit_depth={} cuda_copy={} cuda_invert={} note=copy_is_default",
                     extra.what_gpu(),
                     extra.device_index(),
                     extra.bit_depth(),
                     cuda_copy,
                     cuda_invert,
-                    mode
                 ));
+                // AE selects CUDA only on Windows; macOS uses Metal.
+                #[cfg(windows)]
                 if extra.what_gpu() == ae::GpuFramework::Cuda {
-                    cuda_render_gpu_worlds(&in_data, &extra, mode)?;
-                } else {
-                    log_gpu_worlds(&in_data, &extra);
-                    append_log("SmartRenderGpu refused: only CUDA copy currently writes output");
-                    return Err(ae::Error::Generic);
+                    let mode = if cuda_invert {
+                        CudaBgra128Mode::InvertRgb
+                    } else {
+                        CudaBgra128Mode::Copy
+                    };
+                    return cuda_render_gpu_worlds(&in_data, &extra, mode);
                 }
+                log_gpu_worlds(&in_data, &extra);
+                append_log("SmartRenderGpu refused: only CUDA copy currently writes output");
+                return Err(ae::Error::Generic);
             }
             _ => {}
         }
@@ -163,6 +168,7 @@ impl AdobePluginGlobal for Plugin {
     }
 }
 
+#[cfg(windows)]
 fn cuda_render_gpu_worlds(
     in_data: &ae::InData,
     extra: &ae::pf::SmartRenderExtra,
@@ -173,122 +179,122 @@ fn cuda_render_gpu_worlds(
         return Err(ae::Error::Generic);
     };
     let cb = extra.callbacks();
-    let mut input = cb.checkout_layer_pixels(0)?.ok_or(ae::Error::Generic)?;
-    let mut output = cb.checkout_output()?.ok_or(ae::Error::Generic)?;
+    // The input is checked in on every exit path, including panics.
+    with_checkouts(&cb, ae::Error::Generic, |t| {
+        let mut input = t.checkout_required(0, ae::Error::Generic)?;
+        let mut output = cb.checkout_output()?.ok_or(ae::Error::Generic)?;
 
-    append_gpu_world("input", in_data, &gpu_suite, &mut input);
-    append_gpu_world("output", in_data, &gpu_suite, &mut output);
+        append_gpu_world("input", in_data, &gpu_suite, &mut input);
+        append_gpu_world("output", in_data, &gpu_suite, &mut output);
 
-    let input_ptr = gpu_suite
-        .gpu_world_data(in_data.effect_ref(), &mut input)
-        .map_err(|err| {
-            append_log(&format!("CUDA render failed: input gpu_world_data {err:?}"));
-            ae::Error::Generic
-        })?;
-    let output_ptr = gpu_suite
-        .gpu_world_data(in_data.effect_ref(), &mut output)
-        .map_err(|err| {
-            append_log(&format!(
-                "CUDA render failed: output gpu_world_data {err:?}"
-            ));
-            ae::Error::Generic
-        })?;
-    let info = gpu_suite
-        .device_info(in_data.effect_ref(), extra.device_index())
-        .map_err(|err| {
-            append_log(&format!("CUDA render failed: device_info {err:?}"));
-            ae::Error::Generic
-        })?;
+        let input_ptr = gpu_suite
+            .gpu_world_data(in_data.effect_ref(), &mut input)
+            .map_err(|err| {
+                append_log(&format!("CUDA render failed: input gpu_world_data {err:?}"));
+                ae::Error::Generic
+            })?;
+        let output_ptr = gpu_suite
+            .gpu_world_data(in_data.effect_ref(), &mut output)
+            .map_err(|err| {
+                append_log(&format!(
+                    "CUDA render failed: output gpu_world_data {err:?}"
+                ));
+                ae::Error::Generic
+            })?;
+        let info = gpu_suite
+            .device_info(in_data.effect_ref(), extra.device_index())
+            .map_err(|err| {
+                append_log(&format!("CUDA render failed: device_info {err:?}"));
+                ae::Error::Generic
+            })?;
 
-    let device_probe = AeGpuDeviceProbe {
-        framework: map_framework(extra.what_gpu()),
-        device_index: extra.device_index() as i32,
-        can_render_f32: true,
-    };
-    let device = AeGpuDeviceContext {
-        probe: device_probe,
-        handles: AeGpuDeviceHandles {
-            platform: info.platformPV,
-            device: info.devicePV,
-            context: info.contextPV,
-            command_queue: info.command_queuePV,
-        },
-    };
+        let device_probe = AeGpuDeviceProbe {
+            framework: map_framework(extra.what_gpu()),
+            device_index: extra.device_index() as i32,
+            can_render_f32: true,
+        };
+        let device = AeGpuDeviceContext {
+            probe: device_probe,
+            handles: AeGpuDeviceHandles {
+                platform: info.platformPV,
+                device: info.devicePV,
+                context: info.contextPV,
+                command_queue: info.command_queuePV,
+            },
+        };
 
-    let width = input.width().min(output.width());
-    let height = input.height().min(output.height());
-    let input_size = gpu_suite
-        .gpu_world_size(
-            in_data.effect_ref(),
-            WorldPtr(ae::AsMutPtr::as_mut_ptr(&mut input)),
-        )
-        .map_err(|_| ae::Error::Generic)?;
-    let output_size = gpu_suite
-        .gpu_world_size(
-            in_data.effect_ref(),
-            WorldPtr(ae::AsMutPtr::as_mut_ptr(&mut output)),
-        )
-        .map_err(|_| ae::Error::Generic)?;
-    let job = NativeRenderJob {
-        device,
-        input: AeGpuFrameProbe {
-            device: device_probe,
+        let width = input.width().min(output.width());
+        let height = input.height().min(output.height());
+        let input_size = gpu_suite
+            .gpu_world_size(
+                in_data.effect_ref(),
+                WorldPtr(ae::AsMutPtr::as_mut_ptr(&mut input)),
+            )
+            .map_err(|_| ae::Error::Generic)?;
+        let output_size = gpu_suite
+            .gpu_world_size(
+                in_data.effect_ref(),
+                WorldPtr(ae::AsMutPtr::as_mut_ptr(&mut output)),
+            )
+            .map_err(|_| ae::Error::Generic)?;
+        let job = NativeRenderJob {
+            device,
+            input: AeGpuFrameProbe {
+                device: device_probe,
+                width: width as u32,
+                height: height as u32,
+                row_bytes: input.row_bytes() as usize,
+                byte_len: input_size,
+                format: NativePixelFormat::Bgra32Float,
+                access: NativeFrameAccess::ReadOnly,
+                handle: NativeHandle::CudaDevicePtr(input_ptr as u64),
+            },
+            output: AeGpuFrameProbe {
+                device: device_probe,
+                width: width as u32,
+                height: height as u32,
+                row_bytes: output.row_bytes() as usize,
+                byte_len: output_size,
+                format: NativePixelFormat::Bgra32Float,
+                access: NativeFrameAccess::WriteOnly,
+                handle: NativeHandle::CudaDevicePtr(output_ptr as u64),
+            },
+        };
+        let classification = job.classify();
+        append_log(&format!(
+            "NativeRenderJob class={classification:?} job={job:?}"
+        ));
+        if classification != NativeProbeStatus::ReadyForBackend {
+            return Err(ae::Error::Generic);
+        }
+
+        let context = job.device.handles.context;
+        let stream = job.device.handles.command_queue;
+        match ae_gpu_lab_cuda::process_bgra128_pitched(CudaBgra128Job {
+            context,
+            stream,
+            input: input_ptr,
+            output: output_ptr,
             width: width as u32,
             height: height as u32,
-            row_bytes: input.row_bytes() as usize,
-            byte_len: input_size,
-            format: NativePixelFormat::Bgra32Float,
-            access: NativeFrameAccess::ReadOnly,
-            handle: NativeHandle::CudaDevicePtr(input_ptr as u64),
-        },
-        output: AeGpuFrameProbe {
-            device: device_probe,
-            width: width as u32,
-            height: height as u32,
-            row_bytes: output.row_bytes() as usize,
-            byte_len: output_size,
-            format: NativePixelFormat::Bgra32Float,
-            access: NativeFrameAccess::WriteOnly,
-            handle: NativeHandle::CudaDevicePtr(output_ptr as u64),
-        },
-    };
-    let classification = job.classify();
-    append_log(&format!(
-        "NativeRenderJob class={classification:?} job={job:?}"
-    ));
-    if classification != NativeProbeStatus::ReadyForBackend {
-        let _ = cb.checkin_layer_pixels(0);
-        return Err(ae::Error::Generic);
-    }
-
-    let context = job.device.handles.context;
-    let stream = job.device.handles.command_queue;
-    match ae_gpu_lab_cuda::process_bgra128_pitched(CudaBgra128Job {
-        context,
-        stream,
-        input: input_ptr,
-        output: output_ptr,
-        width: width as u32,
-        height: height as u32,
-        input_rowbytes: job.input.row_bytes as u32,
-        output_rowbytes: job.output.row_bytes as u32,
-        mode,
-    }) {
-        Ok(()) => {
-            append_log(&format!(
+            input_rowbytes: job.input.row_bytes as u32,
+            output_rowbytes: job.output.row_bytes as u32,
+            mode,
+        }) {
+            Ok(()) => {
+                append_log(&format!(
                 "CUDA render OK mode={mode:?} context={context:p} stream={stream:p} input={input_ptr:p} output={output_ptr:p} width={width} height={height} in_rowbytes={} out_rowbytes={}",
                 input.row_bytes(),
                 output.row_bytes(),
             ));
-            let _ = cb.checkin_layer_pixels(0);
-            Ok(())
+                Ok(())
+            }
+            Err(err) => {
+                append_log(&format!("CUDA render failed: {err}"));
+                Err(ae::Error::Generic)
+            }
         }
-        Err(err) => {
-            append_log(&format!("CUDA render failed: {err}"));
-            let _ = cb.checkin_layer_pixels(0);
-            Err(ae::Error::Generic)
-        }
-    }
+    })
 }
 
 fn log_gpu_worlds(in_data: &ae::InData, extra: &ae::pf::SmartRenderExtra) {
@@ -307,22 +313,20 @@ fn log_gpu_worlds(in_data: &ae::InData, extra: &ae::pf::SmartRenderExtra) {
         Err(err) => append_log(&format!("GPUDeviceInfo error={err:?}")),
     }
 
-    match cb.checkout_layer_pixels(0) {
-        Ok(Some(mut input)) => {
-            append_gpu_world("input", in_data, &gpu_suite, &mut input);
-            let _ = cb.checkin_layer_pixels(0);
+    // Diagnostics only: errors are logged, and the input is always checked in.
+    let _ = with_checkouts(&cb, ae::Error::Generic, |t| {
+        match t.checkout(0) {
+            Ok(Some(mut input)) => append_gpu_world("input", in_data, &gpu_suite, &mut input),
+            Ok(None) => append_log("SmartRenderGpu input checkout returned None"),
+            Err(err) => append_log(&format!("SmartRenderGpu input checkout error={err:?}")),
         }
-        Ok(None) => append_log("SmartRenderGpu input checkout returned None"),
-        Err(err) => append_log(&format!("SmartRenderGpu input checkout error={err:?}")),
-    }
-
-    match cb.checkout_output() {
-        Ok(Some(mut output)) => {
-            append_gpu_world("output", in_data, &gpu_suite, &mut output);
+        match cb.checkout_output() {
+            Ok(Some(mut output)) => append_gpu_world("output", in_data, &gpu_suite, &mut output),
+            Ok(None) => append_log("SmartRenderGpu output checkout returned None"),
+            Err(err) => append_log(&format!("SmartRenderGpu output checkout error={err:?}")),
         }
-        Ok(None) => append_log("SmartRenderGpu output checkout returned None"),
-        Err(err) => append_log(&format!("SmartRenderGpu output checkout error={err:?}")),
-    }
+        Ok(())
+    });
 }
 
 fn append_gpu_world(
@@ -417,28 +421,49 @@ fn smart_pre_render(
 
 fn smart_render(extra: &ae::pf::SmartRenderExtra) -> Result<(), ae::Error> {
     let cb = extra.callbacks();
-    let input = cb.checkout_layer_pixels(0)?.ok_or(ae::Error::Generic)?;
-    let mut output = cb.checkout_output()?.ok_or(ae::Error::Generic)?;
-    copy_layer(&input, &mut output);
-    cb.checkin_layer_pixels(0)?;
-    Ok(())
+    with_checkouts(&cb, ae::Error::Generic, |t| {
+        let input = t.checkout_required(0, ae::Error::Generic)?;
+        let mut output = cb.checkout_output()?.ok_or(ae::Error::Generic)?;
+        copy_layer(&input, &mut output)
+    })
 }
 
-fn copy_layer(input: &ae::Layer, output: &mut ae::Layer) {
-    let width = input.width().min(output.width()) as usize;
-    let height = input.height().min(output.height()) as usize;
-    let in_stride = input.buffer_stride();
-    let out_stride = output.buffer_stride();
-    let src = input.buffer();
-    let dst = output.buffer_mut();
-    let row_len = width * 4;
-    for y in 0..height {
-        let si = y * in_stride;
-        let di = y * out_stride;
-        if si + row_len <= src.len() && di + row_len <= dst.len() {
-            dst[di..di + row_len].copy_from_slice(&src[si..si + row_len]);
+/// Raw pass-through copy of a CPU world, top-left aligned.
+///
+/// Both worlds are validated first (World Suite depth, signed stride,
+/// alignment, NULL, overflow). Rows are addressed with the signed stride and
+/// copied as `width * pixel_bytes` (the previous `width * 4` was only correct
+/// for 8 bpc). Output pixels not covered by the input become transparent.
+fn copy_layer(input: &ae::Layer, output: &mut ae::Layer) -> Result<(), ae::Error> {
+    let src = world_layout(input)?;
+    let dst = world_layout(output)?;
+    if dst.is_empty() {
+        return Ok(());
+    }
+    if !src.is_empty() && src.depth != dst.depth {
+        return Err(ae::Error::BadCallbackParameter);
+    }
+    let width = src.width.min(dst.width);
+    let height = if src.is_empty() {
+        0
+    } else {
+        src.height.min(dst.height)
+    };
+    let copied = width * dst.depth.pixel_bytes();
+    // SAFETY: both layouts were validated against these pointers; AE owns the
+    // allocations for this call and input/output are distinct worlds.
+    let (src_ptr, dst_ptr) = unsafe { (input.data_ptr(), output.data_ptr_mut()) };
+    for y in 0..dst.height {
+        let out_row = unsafe { dst.row_mut(dst_ptr, y) };
+        if y < height {
+            let in_row = unsafe { src.row(src_ptr, y) };
+            out_row[..copied].copy_from_slice(&in_row[..copied]);
+            out_row[copied..].fill(0);
+        } else {
+            out_row.fill(0);
         }
     }
+    Ok(())
 }
 
 fn record_probe(probe: AeGpuDeviceProbe, selector: &str) {
