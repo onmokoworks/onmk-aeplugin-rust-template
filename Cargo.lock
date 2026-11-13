@@ -71,8 +71,8 @@ dependencies = [
 
 [[package]]
 name = "after-effects"
-version = "0.4.0"
-source = "git+https://github.com/virtualritz/after-effects.git?rev=6326884ee0af7bf9e1e3f4df0057149a7fb16b5d#6326884ee0af7bf9e1e3f4df0057149a7fb16b5d"
+version = "0.3.0"
+source = "git+https://github.com/virtualritz/after-effects.git?rev=0e0b197850f28c1bb24e8c82fce2e3d4c120d1e9#0e0b197850f28c1bb24e8c82fce2e3d4c120d1e9"
 dependencies = [
  "after-effects-sys",
  "bincode",
@@ -96,9 +96,9 @@ dependencies = [
 
 [[package]]
 name = "after-effects-sys"
-version = "0.4.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a588fadd80fd7ed09cc0a335c8a3169f632cdb90acc757c8e238880fa964950"
+checksum = "8ec61a1cf15ebdf997b5f5c14dbb0af64ece085464bc7f4c6206ecd307e2ba42"
 dependencies = [
  "bindgen",
 ]
@@ -200,9 +200,9 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "base64"
-version = "0.22.1"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
+checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
 
 [[package]]
 name = "bincode"
@@ -317,9 +317,9 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "cc"
-version = "1.2.63"
+version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "556e016178bb5662a08681bbe0f00f8e17631781a4dfc8c45e466e4b185ec27f"
+checksum = "4ff2a8126fff0f8c839080d619675a585e61720bb12d2baceae45769fd66f155"
 dependencies = [
  "find-msvc-tools",
  "shlex 2.0.1",
@@ -538,9 +538,9 @@ checksum = "9f1f227452a390804cdb637b74a86990f2a7d7ba4b7d5693aac9b4dd6defd8d6"
 
 [[package]]
 name = "find-msvc-tools"
-version = "0.1.9"
+version = "0.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5baebc0774151f905a1a2cc41989300b1e6fbb29aff0ceffa1064fdd3088d582"
+checksum = "1c66915cc5391097de7a2b0b972e8505aa33c0df401fd3a6811dbdb32881ba48"
 
 [[package]]
 name = "foldhash"
@@ -1089,7 +1089,7 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 [[package]]
 name = "pipl"
 version = "0.1.1"
-source = "git+https://github.com/virtualritz/after-effects.git?rev=6326884ee0af7bf9e1e3f4df0057149a7fb16b5d#6326884ee0af7bf9e1e3f4df0057149a7fb16b5d"
+source = "git+https://github.com/virtualritz/after-effects.git?rev=0e0b197850f28c1bb24e8c82fce2e3d4c120d1e9#0e0b197850f28c1bb24e8c82fce2e3d4c120d1e9"
 dependencies = [
  "bitflags",
  "byteorder",
@@ -1106,9 +1106,9 @@ checksum = "19f132c84eca552bf34cab8ec81f1c1dcc229b811638f9d283dceabe58c5569e"
 
 [[package]]
 name = "plist"
-version = "1.9.0"
+version = "1.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "092791278e026273c1b65bbdcfbba3a300f2994c896bd01ab01da613c29c46f1"
+checksum = "327a4cb2ad49dc48adfdc9da89e22c64d488b508c67a044d71ba729e4521a285"
 dependencies = [
  "base64",
  "indexmap",
@@ -1183,9 +1183,9 @@ checksum = "3d595e54a326bc53c1c197b32d295e14b169e3cfeaa8dc82b529f947fba6bcf5"
 
 [[package]]
 name = "quick-xml"
-version = "0.39.4"
+version = "0.42.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdcc8dd4e2f670d309a5f0e83fe36dfdc05af317008fea29144da1a2ac858e5e"
+checksum = "41b1177fdf999d2321d3fb46ff47159d9c1fb9ad66a4879f8c50a0b504615e9b"
 dependencies = [
  "memchr",
 ]
