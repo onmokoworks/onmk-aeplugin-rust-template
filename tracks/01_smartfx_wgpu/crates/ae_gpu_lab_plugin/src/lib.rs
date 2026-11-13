@@ -3,6 +3,8 @@ use ae_gpu_lab_core::{
     render_cpu, BackendTiming, BenchEffect, FrameDesc, FrameRgba8, FrameView, FrameViewMut,
     LabParams, PixelFormat,
 };
+use ae_plugin_kit::ae::{world_layout, write_layer};
+use ae_plugin_kit::{with_checkouts, Depth};
 use after_effects as ae;
 use std::panic::catch_unwind;
 use std::sync::{Mutex, OnceLock};
@@ -196,6 +198,14 @@ fn render_layer(
     out_layer: &mut ae::Layer,
 ) -> Result<(), ae::Error> {
     let pp = get_params(params)?;
+    if world_layout(out_layer)?.is_empty() {
+        return Ok(());
+    }
+    if world_layout(in_layer)?.is_empty() {
+        // Nothing visible in the input: return a transparent frame.
+        let pixels = vec![[0.0; 4]; out_layer.width() * out_layer.height()];
+        return write_layer(out_layer, &pixels).map(|_| ());
+    }
     let frame = layer_to_rgba(in_layer)?;
     let out = dispatch(pp, &frame);
     rgba_to_layer(&out, out_layer)?;
@@ -238,11 +248,12 @@ fn smart_render(
     params: &ae::Parameters<Params>,
 ) -> Result<(), ae::Error> {
     let cb = extra.callbacks();
-    let input = cb.checkout_layer_pixels(0)?.ok_or(ae::Error::Generic)?;
-    let mut output = cb.checkout_output()?.ok_or(ae::Error::Generic)?;
-    render_layer(params, &input, &mut output)?;
-    cb.checkin_layer_pixels(0)?;
-    Ok(())
+    // The input is checked in again on success, error and panic.
+    with_checkouts(&cb, ae::Error::Generic, |t| {
+        let input = t.checkout_required(0, ae::Error::Generic)?;
+        let mut output = cb.checkout_output()?.ok_or(ae::Error::Generic)?;
+        render_layer(params, &input, &mut output)
+    })
 }
 
 fn layer_to_rgba(layer: &ae::Layer) -> Result<FrameRgba8, ae::Error> {
@@ -259,17 +270,29 @@ fn rgba_to_layer(frame: &FrameRgba8, layer: &mut ae::Layer) -> Result<(), ae::Er
         .map_err(|_| ae::Error::Generic)
 }
 
+/// Validate the world and describe it for `FrameView`.
+///
+/// - Depth comes from the World Suite pixel format. `Layer::bit_depth()`
+///   reports 16 for every DEEP world, including ARGB128 float worlds.
+/// - Stride, alignment, NULL and overflow are checked before
+///   `Layer::buffer()` forms a slice.
+/// - `FrameView` addresses rows from the start of the slice, so negative
+///   strides (bottom-up worlds) are rejected here instead of being read
+///   upside down. `ae_plugin_kit::ae::read_layer` supports them if needed.
 fn layer_desc(layer: &ae::Layer) -> Result<FrameDesc, ae::Error> {
-    let format = match layer.bit_depth() {
-        8 => PixelFormat::AeArgb8,
-        16 => PixelFormat::AeArgb16,
-        32 => PixelFormat::AeArgb32Float,
-        _ => return Err(ae::Error::Generic),
+    let layout = world_layout(layer)?;
+    if layout.is_empty() || layout.row_bytes < 0 {
+        return Err(ae::Error::BadCallbackParameter);
+    }
+    let format = match layout.depth {
+        Depth::U8 => PixelFormat::AeArgb8,
+        Depth::U16 => PixelFormat::AeArgb16,
+        Depth::F32 => PixelFormat::AeArgb32Float,
     };
     Ok(FrameDesc {
-        width: layer.width() as u32,
-        height: layer.height() as u32,
-        row_bytes: layer.buffer_stride(),
+        width: u32::try_from(layout.width).map_err(|_| ae::Error::BadCallbackParameter)?,
+        height: u32::try_from(layout.height).map_err(|_| ae::Error::BadCallbackParameter)?,
+        row_bytes: layout.row_bytes as usize,
         format,
     })
 }

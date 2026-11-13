@@ -1,0 +1,10 @@
+[package]
+name = "ae_plugin_build"
+description = "build.rs helper: emit the AE PiPL (binary resource on Windows) and the env/cfg values the after-effects crate expects."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+pipl.workspace = true
+winres = "0.1"

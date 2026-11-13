@@ -1,0 +1,17 @@
+[package]
+name = "ae_minimal_plugin"
+description = "CPU-only SmartFX starter effect (AeMinimal.aex): 8/16/32 bpc, straight alpha."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+ae_plugin_kit = { workspace = true, features = ["ae"] }
+after-effects.workspace = true
+
+[build-dependencies]
+ae_plugin_build.workspace = true
+pipl.workspace = true

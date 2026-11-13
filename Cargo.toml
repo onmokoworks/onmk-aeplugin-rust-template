@@ -1,5 +1,8 @@
 [workspace]
 members = [
+    "crates/ae_plugin_kit",
+    "crates/ae_plugin_build",
+    "tracks/00_cpu_minimal/crates/ae_minimal_plugin",
     "tracks/01_smartfx_wgpu/crates/ae_gpu_lab_core",
     "tracks/01_smartfx_wgpu/crates/ae_gpu_lab_cli",
     "tracks/01_smartfx_wgpu/crates/ae_gpu_lab_plugin",
@@ -9,6 +12,9 @@ members = [
     "tracks/03_wgpu_hal_external_import/crates/ae_gpu_lab_wgpu_hal_import",
 ]
 default-members = [
+    "crates/ae_plugin_kit",
+    "crates/ae_plugin_build",
+    "tracks/00_cpu_minimal/crates/ae_minimal_plugin",
     "tracks/01_smartfx_wgpu/crates/ae_gpu_lab_core",
     "tracks/01_smartfx_wgpu/crates/ae_gpu_lab_cli",
 ]
@@ -25,13 +31,15 @@ bytemuck = { version = "1", features = ["derive"] }
 clap = { version = "4", features = ["derive"] }
 libloading = "0.8"
 pollster = "0.4"
+ae_plugin_kit = { path = "crates/ae_plugin_kit" }
+ae_plugin_build = { path = "crates/ae_plugin_build" }
 wgpu = "26"
 wgpu-hal = "26"
 
 [workspace.dependencies.after-effects]
 git = "https://github.com/virtualritz/after-effects.git"
-rev = "6326884ee0af7bf9e1e3f4df0057149a7fb16b5d"
+rev = "0e0b197850f28c1bb24e8c82fce2e3d4c120d1e9"
 
 [workspace.dependencies.pipl]
 git = "https://github.com/virtualritz/after-effects.git"
-rev = "6326884ee0af7bf9e1e3f4df0057149a7fb16b5d"
+rev = "0e0b197850f28c1bb24e8c82fce2e3d4c120d1e9"

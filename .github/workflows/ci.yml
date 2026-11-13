@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  windows:
+    name: Windows x64
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.88.0
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: cargo fmt --all --check
+      # Whole workspace, including the GPU tracks: CUDA is loaded at run time
+      # (no toolkit needed) and GPU tests that need an adapter are #[ignore]d.
+      - name: Build
+        run: cargo build --release --workspace --locked
+      - name: Test
+        run: cargo test --release --workspace --locked --no-fail-fast
+      - name: Clippy (shared crates and starter effect)
+        run: cargo clippy --release --locked -p ae_plugin_kit --all-features -p ae_plugin_build -p ae_minimal_plugin --all-targets -- -D warnings
+      - name: Script tests (alpha checker, smoke oracles, installer on a fake root)
+        run: python -m unittest discover -s scripts -p "test_*.py" -v
+      - name: Stage plug-ins into dist (no install)
+        shell: pwsh
+        run: ./scripts/install-ae-plugin.ps1 -Plugin minimal,lab,probe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aex-windows-x64
+          path: dist/*.aex
+          if-no-files-found: error
+
+  macos:
+    name: macOS ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '11.0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.88.0
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      # Builds and unit tests only. Bundling (.plugin), signing and loading
+      # in After Effects are not covered by CI.
+      - name: Build
+        run: cargo build --release --workspace --locked --target ${{ matrix.target }}
+      - name: Test
+        run: cargo test --release --workspace --locked --target ${{ matrix.target }} --no-fail-fast
+      - name: Script tests (installer tests skip off Windows)
+        run: python3 -m unittest discover -s scripts -p "test_*.py" -v

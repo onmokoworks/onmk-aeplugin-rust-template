@@ -1,0 +1,15 @@
+[package]
+name = "ae_plugin_kit"
+description = "Host-independent helpers for AE effect plug-ins: checked world access, render cleanup, straight-alpha pixel codecs, bounded row parallelism and SIMD kernels."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = []
+# Adapters for the pinned `after-effects` crate (Layer, PixelFormat, SmartRender callbacks).
+# The core modules stay usable and testable without the SDK wrapper.
+ae = ["dep:after-effects"]
+
+[dependencies]
+after-effects = { workspace = true, optional = true }

@@ -8,9 +8,14 @@ license.workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
-ae_gpu_lab_cuda = { path = "../ae_gpu_lab_cuda" }
 ae_gpu_lab_native_probe = { path = "../ae_gpu_lab_native_probe" }
+ae_plugin_kit = { workspace = true, features = ["ae"] }
 after-effects.workspace = true
 
+# AE only selects CUDA on Windows; on macOS the official GPU path is Metal.
+[target.'cfg(windows)'.dependencies]
+ae_gpu_lab_cuda = { path = "../ae_gpu_lab_cuda" }
+
 [build-dependencies]
+ae_plugin_build.workspace = true
 pipl.workspace = true

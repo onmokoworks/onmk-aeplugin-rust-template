@@ -61,19 +61,32 @@ fn color_main(@builtin(global_invocation_id) id: vec3<u32>) {
     ));
 }
 
+// Straight RGBA8 in and out. Spatial filters weight RGB by alpha (the same
+// as premultiply -> filter -> un-premultiply) so transparent pixels do not
+// leak their hidden RGB; see docs/alpha-contract.md.
+fn unpremultiply_sum(rgb_alpha_sum: vec3<f32>, alpha_sum: f32, alpha: f32) -> vec4<f32> {
+    if alpha_sum <= 0.0 {
+        return vec4<f32>(0.0, 0.0, 0.0, alpha);
+    }
+    return vec4<f32>(rgb_alpha_sum / alpha_sum, alpha);
+}
+
 @compute @workgroup_size(16, 16, 1)
 fn box_blur_main(@builtin(global_invocation_id) id: vec3<u32>) {
     if !inside(id) { return; }
     let r = i32(min(params.size.w, 32u));
-    var sum = vec4<f32>(0.0);
+    var rgb = vec3<f32>(0.0);
+    var alpha_sum = 0.0;
     var count = 0.0;
     for (var oy = -r; oy <= r; oy = oy + 1) {
         for (var ox = -r; ox <= r; ox = ox + 1) {
-            sum += sample_px(i32(id.x) + ox, i32(id.y) + oy);
+            let c = sample_px(i32(id.x) + ox, i32(id.y) + oy);
+            rgb += c.rgb * c.a;
+            alpha_sum += c.a;
             count += 1.0;
         }
     }
-    output_img[idx(id.x, id.y)] = pack_rgba(sum / count);
+    output_img[idx(id.x, id.y)] = pack_rgba(unpremultiply_sum(rgb, alpha_sum, alpha_sum / count));
 }
 
 @compute @workgroup_size(16, 16, 1)
@@ -81,12 +94,15 @@ fn diffusion_main(@builtin(global_invocation_id) id: vec3<u32>) {
     if !inside(id) { return; }
     let x = i32(id.x);
     let y = i32(id.y);
-    let c = sample_px(x, y) * 0.50
-        + sample_px(x - 1, y) * 0.125
-        + sample_px(x + 1, y) * 0.125
-        + sample_px(x, y - 1) * 0.125
-        + sample_px(x, y + 1) * 0.125;
-    output_img[idx(id.x, id.y)] = pack_rgba(c);
+    let c0 = sample_px(x, y);
+    let c1 = sample_px(x - 1, y);
+    let c2 = sample_px(x + 1, y);
+    let c3 = sample_px(x, y - 1);
+    let c4 = sample_px(x, y + 1);
+    let rgb = c0.rgb * c0.a * 0.50
+        + (c1.rgb * c1.a + c2.rgb * c2.a + c3.rgb * c3.a + c4.rgb * c4.a) * 0.125;
+    let alpha = c0.a * 0.50 + (c1.a + c2.a + c3.a + c4.a) * 0.125;
+    output_img[idx(id.x, id.y)] = pack_rgba(unpremultiply_sum(rgb, alpha, alpha));
 }
 
 @compute @workgroup_size(16, 16, 1)
