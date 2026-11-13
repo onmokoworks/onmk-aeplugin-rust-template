@@ -71,6 +71,17 @@ unless a real-machine probe proves that a backend exposes a texture.
 
 Do not put wgpu-hal import code here. This track only classifies AE/native GPU state.
 
+Platform notes:
+
+- `ae_gpu_lab_cuda` is a Windows-only dependency of the probe plug-in and all
+  CUDA calls are `#[cfg(windows)]`. On macOS the plug-in builds, logs GPU
+  worlds and refuses `SmartRenderGpu`.
+- The CPU fallback copy validates both worlds (World Suite depth, signed
+  stride, alignment, NULL, overflow) and copies `width * pixel_bytes` per row,
+  so 16/32 bpc pass through unchanged.
+- Every `SmartRender` / `SmartRenderGpu` path, including the CUDA path and the
+  GPU world logger, checks the input layer back in on error and panic.
+
 Next work:
 
 - Add native Metal BGRA128 copy/invert using `MTLBuffer`.
